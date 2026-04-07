@@ -1,0 +1,17 @@
+name: Daily UPC Dedup
+
+on:
+  schedule:
+    - cron: '0 16 * * *'  # Runs daily at 8am PST (UTC-8)
+  workflow_dispatch:       # Allows manual trigger from GitHub UI
+
+jobs:
+  dedup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run UPC dedup script
+        env:
+          SHOPIFY_TOKEN: ${{ secrets.SHOPIFY_TOKEN }}
+        run: python3 delete_dash_skus.py
