@@ -2,7 +2,7 @@ name: Daily UPC Dedup
 
 on:
   schedule:
-    - cron: '0 16 * * *'  # Runs daily at 8am PST (UTC-8)
+    - cron: '0 8 * * *'  # Runs daily at midnight PST (UTC-8)
   workflow_dispatch:       # Allows manual trigger from GitHub UI
 
 jobs:
