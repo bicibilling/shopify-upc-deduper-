@@ -157,11 +157,18 @@ app.get('/api/duplicates', requireAuth, async (req, res) => {
 
 app.delete('/api/variants/:productId/:variantId', requireAuth, async (req, res) => {
   const { productId, variantId } = req.params;
-  console.log(`DELETE request: productId=${productId} variantId=${variantId}`);
+  const onlyVariant = req.query.onlyVariant === '1';
+  console.log(`DELETE request: productId=${productId} variantId=${variantId} onlyVariant=${onlyVariant}`);
   try {
-    const response = await shopifyApi().delete(`/products/${productId}/variants/${variantId}.json`);
-    console.log(`DELETE success: status=${response.status}`);
-    res.json({ success: true });
+    if (onlyVariant) {
+      const response = await shopifyApi().delete(`/products/${productId}.json`);
+      console.log(`DELETE product success: status=${response.status}`);
+      res.json({ success: true, deletedProduct: true });
+    } else {
+      const response = await shopifyApi().delete(`/products/${productId}/variants/${variantId}.json`);
+      console.log(`DELETE variant success: status=${response.status}`);
+      res.json({ success: true });
+    }
   } catch (err) {
     console.error('DELETE failed:', err.response?.data || err.message);
     res.status(500).json({ error: err.response?.data?.errors || err.message });

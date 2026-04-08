@@ -132,6 +132,7 @@ function renderCard(v) {
     <div class="card" id="card-${v.variantId}"
       data-variant-id="${v.variantId}"
       data-product-id="${v.productId}"
+      data-only-variant="${v.isOnlyVariant ? '1' : ''}"
       data-product-title="${esc(v.productTitle)}"
       data-variant-title="${esc(v.variantTitle)}">
       <div class="card-image">${imageHtml}</div>
@@ -159,10 +160,12 @@ document.getElementById('groups').addEventListener('click', e => {
   const btn = e.target.closest('.delete-btn');
   if (!btn) return;
   const card = btn.closest('.card');
-  const { variantId, productId, productTitle, variantTitle } = card.dataset;
-  pendingDelete = { variantId, productId, card };
-  document.getElementById('confirm-text').textContent =
-    `Delete "${variantTitle}" from "${productTitle}"? This cannot be undone.`;
+  const { variantId, productId, productTitle, variantTitle, onlyVariant } = card.dataset;
+  const isOnlyVariant = onlyVariant === '1';
+  pendingDelete = { variantId, productId, card, isOnlyVariant };
+  document.getElementById('confirm-text').textContent = isOnlyVariant
+    ? `Delete the entire product "${productTitle}"? This is its only variant. This cannot be undone.`
+    : `Delete "${variantTitle}" from "${productTitle}"? This cannot be undone.`;
   show('confirm-modal');
 });
 
@@ -173,7 +176,7 @@ document.getElementById('confirm-cancel').addEventListener('click', () => {
 
 document.getElementById('confirm-delete').addEventListener('click', async () => {
   if (!pendingDelete) return;
-  const { variantId, productId, card } = pendingDelete;
+  const { variantId, productId, card, isOnlyVariant } = pendingDelete;
   pendingDelete = null;
   hide('confirm-modal');
 
@@ -182,20 +185,21 @@ document.getElementById('confirm-delete').addEventListener('click', async () => 
   card.querySelector('.delete-btn').textContent = 'Deleting…';
   card.querySelector('.delete-btn').disabled = true;
 
-  await deleteVariant(variantId, productId, card);
+  await deleteVariant(variantId, productId, card, isOnlyVariant);
 });
 
-async function deleteVariant(variantId, productId, card) {
+async function deleteVariant(variantId, productId, card, isOnlyVariant) {
   const btn = card.querySelector('.delete-btn');
 
   try {
-    const res = await apiFetch(`/api/variants/${productId}/${variantId}`, { method: 'DELETE' });
+    const url = `/api/variants/${productId}/${variantId}${isOnlyVariant ? '?onlyVariant=1' : ''}`;
+    const res = await apiFetch(url, { method: 'DELETE' });
     if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
 
     card.classList.remove('deleting');
     card.classList.add('deleted');
     btn.textContent = 'Deleted';
-    showToast('Variant deleted', 'success');
+    showToast(isOnlyVariant ? 'Product deleted' : 'Variant deleted', 'success');
 
     // Collapse group if only one card remains
     const groupCards = card.closest('.cards');
