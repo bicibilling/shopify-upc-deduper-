@@ -115,12 +115,12 @@ def main():
                     status = shopify_delete(
                         token, f"/products/{v['product_id']}.json"
                     )
-                    print(f"  Deleted product {v['product_id']} (only variant, status {status})")
+                    print(f"  Deleted product with SKU {v['sku']} (only variant, status {status})")
                 else:
                     status = shopify_delete(
                         token, f"/products/{v['product_id']}/variants/{v['variant_id']}.json"
                     )
-                    print(f"  Deleted variant {v['variant_id']} (status {status})")
+                    print(f"  Deleted variant with SKU {v['sku']} (status {status})")
                 deleted += 1
                 time.sleep(0.5)  # stay well within rate limits
             except urllib.error.HTTPError as e:
