@@ -80,6 +80,7 @@ def main():
                 "variant_id": variant["id"],
                 "variant_title": variant["title"],
                 "sku": variant.get("sku") or "",
+                "is_only_variant": len(product["variants"]) == 1,
             })
 
     # Find duplicate barcodes where at least one SKU has a dash
@@ -110,10 +111,16 @@ def main():
 
         for v in to_delete:
             try:
-                status = shopify_delete(
-                    token, f"/products/{v['product_id']}/variants/{v['variant_id']}.json"
-                )
-                print(f"  Deleted variant {v['variant_id']} (status {status})")
+                if v["is_only_variant"]:
+                    status = shopify_delete(
+                        token, f"/products/{v['product_id']}.json"
+                    )
+                    print(f"  Deleted product {v['product_id']} (only variant, status {status})")
+                else:
+                    status = shopify_delete(
+                        token, f"/products/{v['product_id']}/variants/{v['variant_id']}.json"
+                    )
+                    print(f"  Deleted variant {v['variant_id']} (status {status})")
                 deleted += 1
                 time.sleep(0.5)  # stay well within rate limits
             except urllib.error.HTTPError as e:
