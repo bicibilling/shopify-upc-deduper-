@@ -13,6 +13,7 @@ const {
   SHOPIFY_CLIENT_ID,
   SHOPIFY_CLIENT_SECRET,
   REDIRECT_URI,
+  SLACK_WEBHOOK_URL,
   PORT = 3000
 } = process.env;
 
@@ -155,18 +156,60 @@ app.get('/api/duplicates', requireAuth, async (req, res) => {
   }
 });
 
+async function notifySlack(text) {
+  if (!SLACK_WEBHOOK_URL) return;
+  try {
+    await axios.post(SLACK_WEBHOOK_URL, { text });
+  } catch (err) {
+    console.error('Slack notification failed:', err.response?.data || err.message);
+  }
+}
+
 app.delete('/api/variants/:productId/:variantId', requireAuth, async (req, res) => {
   const { productId, variantId } = req.params;
   const onlyVariant = req.query.onlyVariant === '1';
   console.log(`DELETE request: productId=${productId} variantId=${variantId} onlyVariant=${onlyVariant}`);
+
+  let snapshot = null;
+  try {
+    const productResp = await shopifyApi().get(`/products/${productId}.json?fields=id,title,variants`);
+    const product = productResp.data.product;
+    const variant = product.variants.find(v => String(v.id) === String(variantId));
+    snapshot = {
+      productTitle: product.title,
+      variantTitle: variant?.title || null,
+      sku: variant?.sku || null,
+      barcode: variant?.barcode || null,
+    };
+  } catch (err) {
+    console.warn('Could not snapshot product before delete:', err.response?.data || err.message);
+  }
+
   try {
     if (onlyVariant) {
       const response = await shopifyApi().delete(`/products/${productId}.json`);
       console.log(`DELETE product success: status=${response.status}`);
+      const lines = [
+        `:wastebasket: *Shopify product deleted* (was the only variant on a duplicate UPC)`,
+        snapshot?.productTitle && `Product: ${snapshot.productTitle}`,
+        snapshot?.sku && `SKU: \`${snapshot.sku}\``,
+        snapshot?.barcode && `Barcode: \`${snapshot.barcode}\``,
+        `Product ID: ${productId}`,
+      ].filter(Boolean);
+      await notifySlack(lines.join('\n'));
       res.json({ success: true, deletedProduct: true });
     } else {
       const response = await shopifyApi().delete(`/products/${productId}/variants/${variantId}.json`);
       console.log(`DELETE variant success: status=${response.status}`);
+      const lines = [
+        `:wastebasket: *Shopify variant deleted* (duplicate UPC)`,
+        snapshot?.productTitle && `Product: ${snapshot.productTitle}`,
+        snapshot?.variantTitle && `Variant: ${snapshot.variantTitle}`,
+        snapshot?.sku && `SKU: \`${snapshot.sku}\``,
+        snapshot?.barcode && `Barcode: \`${snapshot.barcode}\``,
+        `Variant ID: ${variantId} (Product ID: ${productId})`,
+      ].filter(Boolean);
+      await notifySlack(lines.join('\n'));
       res.json({ success: true });
     }
   } catch (err) {
